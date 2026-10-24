@@ -450,7 +450,7 @@ function HomepageLanding({
 }
 
 export default function Home() {
-  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || process.env.NEXT_PUBLIC_NETWORK || "devnet";
+  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || process.env.NEXT_PUBLIC_NETWORK || "mainnet-beta";
   const [viewMode, setViewMode] = useState<"overview" | "batches">("overview");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [signingBatch, setSigningBatch] = useState<BatchItemData | null>(null);
