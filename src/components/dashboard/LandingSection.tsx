@@ -16,6 +16,7 @@ import {
   Server,
   Sparkles,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 
 interface LandingSectionProps {
@@ -23,53 +24,103 @@ interface LandingSectionProps {
   onOpenCreateBatch?: () => void;
 }
 
-export function LandingSection({ onLaunchDashboard, onOpenCreateBatch }: LandingSectionProps) {
-  const [metrics, setMetrics] = useState<{
-    volumeProcessedUsd: number;
-    feesSavedUsd: number;
-    batchesCount: number;
-    recipientsCount: number;
-    totalQualifyingVolumeUsd: number;
-    loading: boolean;
-  }>({
-    volumeProcessedUsd: 0,
-    feesSavedUsd: 0,
-    batchesCount: 0,
-    recipientsCount: 0,
-    totalQualifyingVolumeUsd: 0,
-    loading: false,
-  });
+function Spinner() {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-zinc-500 text-sm font-sans">
+      <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+      <span>Loading...</span>
+    </span>
+  );
+}
 
+export function LandingSection({ onLaunchDashboard, onOpenCreateBatch }: LandingSectionProps) {
+  // EDIT 4: Fix the 4 Loading... stats with guaranteed 8-second fallback timeout
+  // 1. Real Volume Processed
+  const [realVolume, setRealVolume] = useState<string | null>(null);
   useEffect(() => {
-    let isMounted = true;
-    async function loadRealData() {
-      try {
-        const res = await fetch("/api/volume");
-        if (!res.ok) {
-          throw new Error(`Failed to fetch /api/volume: ${res.status} ${res.statusText}`);
-        }
-        const json = await res.json();
-        if (isMounted && json.success && json.metrics) {
-          setMetrics({
-            volumeProcessedUsd: json.metrics.volumeProcessedUsd || 0,
-            feesSavedUsd: json.metrics.feesSavedUsd || 0,
-            batchesCount: json.metrics.batchesCount || 0,
-            recipientsCount: json.metrics.recipientsCount || 0,
-            totalQualifyingVolumeUsd: json.metrics.totalQualifyingVolumeUsd || 0,
-            loading: false,
-          });
-        }
-      } catch (err) {
-        console.error("Failed to load /api/volume metrics in LandingSection:", err);
-        if (isMounted) setMetrics((m) => ({ ...m, loading: false }));
-      }
-    }
-    loadRealData();
-    const interval = setInterval(loadRealData, 10000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    const timeout = setTimeout(() => setRealVolume("$0"), 8000); // fallback
+    fetch("/api/volume")
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        clearTimeout(timeout);
+        const v = data?.metrics?.volumeProcessedUsd;
+        setRealVolume(v && v > 0 ? formatUsd(v) : "$0");
+      })
+      .catch((err) => {
+        console.error("Failed to fetch Real Volume Processed from /api/volume:", err);
+        clearTimeout(timeout);
+        setRealVolume("$0");
+      });
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // 2. Treasury Fees Saved
+  const [feesSaved, setFeesSaved] = useState<string | null>(null);
+  useEffect(() => {
+    const timeout = setTimeout(() => setFeesSaved("$0"), 8000); // fallback
+    fetch("/api/volume")
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        clearTimeout(timeout);
+        const v = data?.metrics?.feesSavedUsd;
+        setFeesSaved(v && v > 0 ? formatUsd(v) : "$0");
+      })
+      .catch((err) => {
+        console.error("Failed to fetch Treasury Fees Saved from /api/volume:", err);
+        clearTimeout(timeout);
+        setFeesSaved("$0");
+      });
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // 3. Payout Batches Settled
+  const [batchesSettled, setBatchesSettled] = useState<string | null>(null);
+  useEffect(() => {
+    const timeout = setTimeout(() => setBatchesSettled("0"), 8000); // fallback
+    fetch("/api/batches")
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        clearTimeout(timeout);
+        const count = data?.batches?.length;
+        setBatchesSettled(count && count > 0 ? count.toLocaleString() : "0");
+      })
+      .catch((err) => {
+        console.error("Failed to fetch Payout Batches Settled from /api/batches:", err);
+        clearTimeout(timeout);
+        setBatchesSettled("0");
+      });
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // 4. Unique Destinations
+  const [uniqueDestinations, setUniqueDestinations] = useState<string | null>(null);
+  useEffect(() => {
+    const timeout = setTimeout(() => setUniqueDestinations("0"), 8000); // fallback
+    fetch("/api/volume")
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        clearTimeout(timeout);
+        const count = data?.metrics?.recipientsCount;
+        setUniqueDestinations(count && count > 0 ? count.toLocaleString() : "0");
+      })
+      .catch((err) => {
+        console.error("Failed to fetch Unique Destinations from /api/volume:", err);
+        clearTimeout(timeout);
+        setUniqueDestinations("0");
+      });
+    return () => clearTimeout(timeout);
   }, []);
 
   return (
@@ -161,6 +212,7 @@ export function LandingSection({ onLaunchDashboard, onOpenCreateBatch }: Landing
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Stat 1: Real Volume Processed */}
             <Card className="border-zinc-800 bg-zinc-900/60 backdrop-blur-sm">
               <CardContent className="p-5 space-y-1">
                 <div className="flex items-center justify-between text-zinc-400">
@@ -168,16 +220,19 @@ export function LandingSection({ onLaunchDashboard, onOpenCreateBatch }: Landing
                   <TrendingUp className="h-4 w-4 text-emerald-400" />
                 </div>
                 <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-                  {metrics.volumeProcessedUsd > 0 ? formatUsd(metrics.volumeProcessedUsd) : "$0"}
+                  {realVolume === null ? <Spinner /> : <span>{realVolume}</span>}
                 </div>
                 <p className="text-[11px] text-zinc-500">
-                  {metrics.volumeProcessedUsd > 0
-                    ? "Strictly ledger-verified Solana principal payouts"
-                    : "No transfers yet"}
+                  {realVolume === null
+                    ? "Querying ledger..."
+                    : realVolume === "$0"
+                    ? "No transfers yet"
+                    : "Strictly ledger-verified Solana principal payouts"}
                 </p>
               </CardContent>
             </Card>
 
+            {/* Stat 2: Treasury Fees Saved */}
             <Card className="border-zinc-800 bg-zinc-900/60 backdrop-blur-sm">
               <CardContent className="p-5 space-y-1">
                 <div className="flex items-center justify-between text-zinc-400">
@@ -185,16 +240,19 @@ export function LandingSection({ onLaunchDashboard, onOpenCreateBatch }: Landing
                   <Coins className="h-4 w-4 text-cyan-400" />
                 </div>
                 <div className="text-2xl sm:text-3xl font-extrabold text-cyan-300 font-mono tracking-tight">
-                  {metrics.feesSavedUsd > 0 ? formatUsd(metrics.feesSavedUsd) : "$0"}
+                  {feesSaved === null ? <Spinner /> : <span>{feesSaved}</span>}
                 </div>
                 <p className="text-[11px] text-zinc-500">
-                  {metrics.feesSavedUsd > 0
-                    ? "2.00% net savings vs legacy custodial wire fee (2.50%)"
-                    : "No transfers yet"}
+                  {feesSaved === null
+                    ? "Querying ledger..."
+                    : feesSaved === "$0"
+                    ? "No transfers yet"
+                    : "2.00% net savings vs legacy custodial wire fee (2.50%)"}
                 </p>
               </CardContent>
             </Card>
 
+            {/* Stat 3: Payout Batches Settled */}
             <Card className="border-zinc-800 bg-zinc-900/60 backdrop-blur-sm">
               <CardContent className="p-5 space-y-1">
                 <div className="flex items-center justify-between text-zinc-400">
@@ -202,16 +260,19 @@ export function LandingSection({ onLaunchDashboard, onOpenCreateBatch }: Landing
                   <FileCheck2 className="h-4 w-4 text-indigo-400" />
                 </div>
                 <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
-                  {metrics.batchesCount > 0 ? metrics.batchesCount.toLocaleString() : "0"}
+                  {batchesSettled === null ? <Spinner /> : <span>{batchesSettled}</span>}
                 </div>
                 <p className="text-[11px] text-zinc-500">
-                  {metrics.batchesCount > 0
-                    ? "Active organizational treasury disbursements"
-                    : "No transfers yet"}
+                  {batchesSettled === null
+                    ? "Querying ledger..."
+                    : batchesSettled === "0"
+                    ? "No transfers yet"
+                    : "Active organizational treasury disbursements"}
                 </p>
               </CardContent>
             </Card>
 
+            {/* Stat 4: Unique Destinations */}
             <Card className="border-zinc-800 bg-zinc-900/60 backdrop-blur-sm">
               <CardContent className="p-5 space-y-1">
                 <div className="flex items-center justify-between text-zinc-400">
@@ -219,12 +280,14 @@ export function LandingSection({ onLaunchDashboard, onOpenCreateBatch }: Landing
                   <Layers className="h-4 w-4 text-amber-400" />
                 </div>
                 <div className="text-2xl sm:text-3xl font-extrabold text-amber-300 font-mono tracking-tight">
-                  {metrics.recipientsCount > 0 ? metrics.recipientsCount.toLocaleString() : "0"}
+                  {uniqueDestinations === null ? <Spinner /> : <span>{uniqueDestinations}</span>}
                 </div>
                 <p className="text-[11px] text-zinc-500">
-                  {metrics.recipientsCount > 0
-                    ? "Individual contributor wallets funded"
-                    : "No transfers yet"}
+                  {uniqueDestinations === null
+                    ? "Querying ledger..."
+                    : uniqueDestinations === "0"
+                    ? "No transfers yet"
+                    : "Individual contributor wallets funded"}
                 </p>
               </CardContent>
             </Card>

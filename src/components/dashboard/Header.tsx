@@ -94,14 +94,14 @@ export function Header() {
         <div className="flex items-center gap-3">
           <Badge
             variant={network === "mainnet-beta" ? "success" : "warning"}
-            className="hidden sm:inline-flex items-center gap-1.5 font-mono text-xs"
+            className="inline-flex items-center gap-1.5 font-mono text-xs px-2.5 py-1"
           >
             <span
               className={`h-2 w-2 rounded-full ${
-                network === "mainnet-beta" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
+                network === "mainnet-beta" ? "bg-emerald-400 animate-pulse" : "bg-amber-400 animate-pulse"
               }`}
             />
-            {network === "mainnet-beta" ? "MAINNET" : "DEVNET"}
+            <span>{network === "mainnet-beta" ? "MAINNET" : "DEVNET"}</span>
           </Badge>
 
           {mounted && (
