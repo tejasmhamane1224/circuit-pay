@@ -17,8 +17,16 @@ export async function POST(req: NextRequest) {
 
     const rawBody = await req.text();
     const signature = req.headers.get("x-multihopper-signature");
-    const secret =
-      process.env.MULTIHOPPER_WEBHOOK_SECRET || "whsec_test_secret_for_local_hmac";
+    const secret = process.env.MULTIHOPPER_WEBHOOK_SECRET;
+    if (!secret) {
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json(
+          { success: false, error: "Server misconfiguration: Webhook secret not set" },
+          { status: 500, headers: rateLimit.headers }
+        );
+      }
+    }
+    const resolvedSecret = secret || "whsec_test_secret_for_local_hmac";
 
     if (!signature) {
       return NextResponse.json(
@@ -27,7 +35,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isValid = verifyMultiHopperWebhook(rawBody, signature, secret);
+    const isValid = verifyMultiHopperWebhook(rawBody, signature, resolvedSecret);
     if (!isValid) {
       return NextResponse.json(
         { success: false, error: "Invalid webhook HMAC signature" },
